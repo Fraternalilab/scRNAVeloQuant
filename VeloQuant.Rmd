@@ -1,0 +1,254 @@
+---
+title: "Velocity in 3D and transition probability analysis"
+author: "Joseph Ng"
+date: "26/06/2020"
+output: html_document
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(plyr)
+library(rgl)
+library(Seurat)
+library(SeuratWrappers)
+```
+
+This markdown document contains codes used to plot `velocyto` results on 3D UMAP projections, and quantification of transition probability between clusters.
+
+In the beginning we also attach the code used to remove Ig, TCR related genes from the variably-expressed features to avoid these genes to bias dimensionality reduction - this might be a useful line for those working with similar cell types.
+
+```{r loadData, echo=FALSE}
+pure <- readRDS('Pure2_finalvs_UMAP3D.rds')
+
+# remove Ig, TCR related genes from variable features
+VariableFeatures(pure) <- VariableFeatures(pure)[!grepl("^IGH[MDE]|^IGHG[1-4]|^IGHA[1-2]|^IG[HKL][VDJ]|^IGKC|^IGLC[1-7]|^TR[ABGD][CV]|^AC233755.1|^IGLL|^JCHAIN", VariableFeatures(pure))]
+pure@active.assay <- 'RNA'
+pure
+
+# write cluster identities as a column in metadata
+pure[['cluster']] <- Idents(pure)
+
+GetClusterCentroids <- function(emb, idents)
+{
+  # function to fetch coordinates of cluster centroids from dimensionality-reduction space
+  emb <- split(as.data.frame(emb), f = idents)
+  o <- do.call("rbind", lapply(emb, function(x) apply(x, MARGIN = 2, median, na.rm = TRUE)))
+  o <- as.data.frame(o)
+  o$celltypes <- names(emb)
+  o
+}
+```
+
+```{r velocity_plotFx, include=FALSE}
+PrepareCellsForVelocity <- function(object, idents, reduction = "umap", dims = c(1, 2),
+                                    clean = TRUE, clean_perc = 0.99)
+{
+  # Select cells of given identities for plotting velocity.
+  # Optinally clean cells by removing cells too far away from the rest of 
+  # the cells of the same cluster. Default use 99% (clean.perc = 0.99) percentile -
+  # cells with distance from cluster centroid beyond this percentile are removed.
+  # This is to avoid cells which are outliers of a given cluster to bias the overall 
+  # velocity depiction (otherwise they might lead to artefact velocity streams different
+  # from the general flow)
+  cell.vec <- Cells(object)[which(Idents(object) %in% idents)]
+  ident.vec <- Idents(object)[which(Idents(object) %in% idents)]
+  emb <- Seurat::Embeddings(object, reduction = reduction)[cell.vec, ]
+  if(clean){
+    centroids <- GetClusterCentroids(emb, ident.vec)
+    dist_from_centroids <- do.call("rbind", lapply(cell.vec, function(cell){
+      id <- as.character(ident.vec[cell])
+      cell.coord <- unlist(emb[cell, ])
+      centroid.coord <- unlist(centroids[which(centroids$celltype == id), 1:ncol(emb)])
+      eucl <- ( (cell.coord[1] - centroid.coord[1])^2 + 
+                  (cell.coord[2] - centroid.coord[2])^2 +
+                  (cell.coord[3] - centroid.coord[3])^2 ) ^ 0.5 # euclidean distance
+      data.frame(CB = cell, celltype = id, distance = eucl, stringsAsFactors = FALSE)
+    }))
+    allowed_dist_from_centroids <- do.call("rbind", lapply(idents, function(i){
+      o <- dist_from_centroids[which(dist_from_centroids$celltype == i), "distance"]
+      data.frame(celltype = i, limit = quantile(o, probs = clean_perc, na.rm = TRUE),
+                 stringsAsFactors = FALSE)
+    }))
+    dist_from_centroids$allowed <- apply(dist_from_centroids, MARGIN = 1, function(x){
+      limit <- allowed_dist_from_centroids[which(allowed_dist_from_centroids$celltype == x[2]),
+                                           "limit"]
+      return(as.numeric(x[3]) < limit)
+    })
+    allowed_cells <- dist_from_centroids[which(dist_from_centroids$allowed), "CB"]
+    emb <- emb[allowed_cells, ]
+  }
+  emb[, dims]
+}
+
+```
+
+## Processing velocity results
+
+We follow [this](https://github.com/satijalab/seurat-wrappers/blob/master/docs/velocity.md) vignette from `SeuratWrappers`. 
+
+```{r velocity_calc, echo=FALSE, message=FALSE, warning=FALSE, fig.width=12, fig.height=4}
+load('scPure_withIgE_velocity.RData')
+colours <- Cells(pure)
+palette <- scales::hue_pal()(10)[c(5,2,9,1,6,4,7,8,10,3)]#[c(4, 6, 10, 3, 7, 8, 1, 9, 2, 5)]
+names(palette) <- levels(Idents(pure))
+for(celltype in levels(Idents(pure))){
+  colours <- replace(colours, which(Idents(pure) == celltype), palette[celltype])
+}
+names(colours) <- Cells(pure)
+# plot here
+par(mfrow = c(1, 3))
+em <- PrepareCellsForVelocity(pure, idents = levels(Idents(pure)),
+                              reduction = "umap", dims = c(1, 3), 
+                              clean = TRUE, clean_perc = 0.9)
+vel_results_13 <- velocyto.R::show.velocity.on.embedding.cor(emb = em, vel = vel, 
+                                                             n = 200, scale = "sqrt", 
+   cell.colors = velocyto.R::ac(x = colours[rownames(em)], alpha = 0.7), 
+   cex = 0.8, arrow.scale = 1.5, show.grid.flow = TRUE, min.grid.cell.mass = 10, 
+   grid.n = 40, arrow.lwd = 1, do.par = FALSE, cell.border.alpha = 0, return.details = TRUE,
+   xlab = "UMAP1", ylab  = "UMAP3")
+
+em <- PrepareCellsForVelocity(pure, idents = levels(Idents(pure)),
+                              reduction = "umap", dims = c(2, 3), 
+                              clean = TRUE, clean_perc = 0.9)
+vel_results_23 <- velocyto.R::show.velocity.on.embedding.cor(emb = em, vel = vel, 
+                                                             n = 200, scale = "sqrt", 
+   cell.colors = velocyto.R::ac(x = colours[rownames(em)], alpha = 0.7), 
+   cex = 0.8, arrow.scale = 1.5, show.grid.flow = TRUE, min.grid.cell.mass = 10, 
+   grid.n = 40, arrow.lwd = 1, do.par = FALSE, cell.border.alpha = 0, return.details = TRUE, 
+   xlab = "UMAP2", ylab  = "UMAP3")
+
+em <- PrepareCellsForVelocity(pure, idents = levels(Idents(pure)),
+                              reduction = "umap", dims = c(1, 2), 
+                              clean = TRUE, clean_perc = 0.9)
+vel_results_12 <- velocyto.R::show.velocity.on.embedding.cor(emb = em, vel = vel, 
+                                                             n = 200, scale = "sqrt", 
+   cell.colors = velocyto.R::ac(x = colours[rownames(em)], alpha = 0.7), 
+   cex = 0.8, arrow.scale = 1.5, show.grid.flow = TRUE, min.grid.cell.mass = 10, 
+   grid.n = 40, arrow.lwd = 1, do.par = FALSE, cell.border.alpha = 0, return.details = TRUE, 
+   xlab = "UMAP1", ylab  = "UMAP2")
+```
+
+# A method to quantify velocity stream to analyse (pairwise) transition between clusters
+
+Here is the implementation of the method to quantify the strength of individual velocity streams (i.e. arrows on the velocity projections) into a transition score between pairs of clusters. This is done by the `count_arrows` function below.
+
+A plotting function (`plotTransition`) is provided to plot the transition scores.
+
+```{r ,fig.width =12, fig.height=3}
+Calc3DEuclDist <- function(pt1, pt2){
+  sqrt( (pt1[1] - pt2[1]) ^ 2 + (pt1[2] -  pt2[2]) ^ 2 + (pt1[3] -  pt2[3]) ^ 2 )
+}
+count_arrows <- function(vel_results, SeuratObj, dims = c(1, 2)){
+  centroids <- GetClusterCentroids(Embeddings(SeuratObj, reduction = "umap")[, dims], 
+                                   idents = Idents(SeuratObj))
+  centroids3d <- GetClusterCentroids(Embeddings(SeuratObj, reduction = "umap")[, 1:3], 
+                                     idents = Idents(SeuratObj))
+  rx <- range(c(range(as.data.frame(vel_results$arrows)$x0),
+                range(as.data.frame(vel_results$arrows)$x1)))
+  ry <- range(c(range(as.data.frame(vel_results$arrows)$y0),
+                range(as.data.frame(vel_results$arrows)$y1)))
+  stepsize_x <- seq(rx[1], rx[2], length.out = 50)
+  stepsize_x <- stepsize_x[2] - stepsize_x[1]
+  stepsize_y <- seq(ry[1], ry[2], length.out = 50)
+  stepsize_y <- stepsize_y[2] - stepsize_y[1]
+
+  arrow_test <- do.call("rbind", apply(vel_results$garrows, MARGIN = 1, function(y){
+    nearby_cells <- as.data.frame(Embeddings(SeuratObj, reduction = "umap")[, dims])
+    nearby_cells <- nearby_cells[nearby_cells[, 1] > (y[1] - stepsize_x / 2) &
+                                 nearby_cells[, 1] < (y[1] + stepsize_x / 2) &
+                                 nearby_cells[, 2] > (y[2] - stepsize_y / 2) &
+                                 nearby_cells[, 2] < (y[2] + stepsize_y / 2) , ]
+    nearby_cells <- Idents(SeuratObj)[rownames(nearby_cells)]
+    majority <- table(nearby_cells)
+    k <- names(which.max(majority))
+    o <- apply(centroids, MARGIN = 1, function(x){
+      X <- y[1:2]
+      Y <- y[3:4]
+      Z <- as.numeric(unlist(x[1:2]))
+      dist_1 <- sqrt( (X[1] - Y[1]) ^ 2 + (X[2] -  Y[2]) ^ 2 )
+      dist_2 <- sqrt( (X[1] - Z[1]) ^ 2 + (X[2] -  Z[2]) ^ 2 )
+      dist_3 <- sqrt( (Y[1] - Z[1]) ^ 2 + (Y[2] -  Z[2]) ^ 2 )
+      sc <- 1 - acos( (dist_1^2 + dist_2^2 - dist_3^2) / (2 * dist_1 * dist_2) )/ pi
+      dist3d_btwCentroids <- Calc3DEuclDist(as.numeric(centroids3d[centroids3d$celltypes == unlist(x[3]),
+                                                                   1:3]),
+                                            as.numeric(centroids3d[centroids3d$celltypes == k,
+                                                                   1:3]))
+      sc * dist_1 / dist_2
+#      if(dist3d_btwCentroids == 0) return(0)
+#      else return(sc * dist_1 / ( dist_2 * dist3d_btwCentroids))
+    })
+    suppressWarnings(o$celltype <- k)
+    as.data.frame(o)
+  }))
+  rownames(arrow_test) <- sapply(1:nrow(arrow_test), function(x) paste("arrow", x, sep = ""))
+  arrow_test <- arrow_test[order(arrow_test[, ncol(arrow_test)]), ]
+  annotation <- data.frame(arrow_test[, ncol(arrow_test)])
+  rownames(annotation) <- rownames(arrow_test)
+  arrow_test <- arrow_test[, 1:(ncol(arrow_test) - 1)]
+
+  arrow_test_summarised <- data.frame(from = as.character(annotation[, 1]), 
+                                      to = apply(arrow_test, 1, 
+                                                 function(x) names(which.max(x))),
+                                      score = apply(arrow_test, 1, max),
+                                      stringsAsFactors = FALSE)
+  arrow_test_summarised[, 2] <- gsub(".", "-", arrow_test_summarised[, 2], fixed= TRUE)
+  arrow_test_summarised <- arrow_test_summarised[which(arrow_test_summarised[, 1] != 
+                                                       arrow_test_summarised[, 2]), ]
+  arrow_test_summarised
+}
+
+# calculate for every pairwise combination of UMAP dimensions
+arrows_12 <- count_arrows(vel_results_12, SeuratObj = pure, dims = c(1, 2))
+arrows_13 <- count_arrows(vel_results_13, SeuratObj = pure, dims = c(1, 3))
+arrows_23 <- count_arrows(vel_results_23, SeuratObj = pure, dims = c(2, 3))
+arrows_12$dim <- "1_2"
+arrows_13$dim <- "1_3"
+arrows_23$dim <- "2_3"
+
+centroids3d <- GetClusterCentroids(Embeddings(pure, reduction = "umap"), Idents(pure))
+
+# evaluate pairwise distances between clusters using the cluster centroids coordinates in 3D
+pairwise_distance <- matrix(NA, nrow = length(levels(Idents(pure))),
+                            ncol = length(levels(Idents(pure))),
+                            dimnames = list(levels(Idents(pure)),
+                                            levels(Idents(pure))))
+for(i in 1:nrow(pairwise_distance)){
+  for(j in 1:nrow(pairwise_distance)){
+    pairwise_distance[i, j] <- Calc3DEuclDist(as.numeric(centroids3d[i, 1:3]),
+                                              as.numeric(centroids3d[j, 1:3]))
+  }
+}
+# normalise into the range [0,1]
+pairwise_distance <- apply(pairwise_distance, MARGIN = 2, function(z){
+  range_z <- range(z[z > 0])
+  z <- replace(z, which(z == 0), NA)
+  1 - (z - range_z[1]) / diff(range_z)
+})
+
+
+plotTransition <- function(tb, pwdist){
+  # function to process the transition score and plot as grid
+  arrow_count_summary <- ddply(tb, #arrows_12, 
+                             .variables = c("from", "to"), summarise, 
+                             total_score = sum(score))
+  arrow_count_summary$total_score <- apply(arrow_count_summary, MARGIN = 1, function(x){
+    as.numeric(x[3]) * pwdist[x[1], x[2]]
+  })
+  arrow_count_toPlot <- arrow_count_summary
+  arrow_count_toPlot$total_score <- log2(1 + arrow_count_toPlot$total_score)
+  ggplot(arrow_count_toPlot, aes(x = from, y = to)) + 
+    geom_tile(aes(fill = total_score)) + theme_classic() + 
+    scale_fill_gradient2() +
+    #scale_fill_gradient2(low = "white", mid = "lavenderblush2", 
+    #                     high = "purple3",  midpoint = 0.7) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1), validate = TRUE)
+}
+
+# how does using different combinations of axes change the picture?
+g1 <- plotTransition(arrows_13, pairwise_distance) + ggtitle("UMAP1v3")
+g2 <- plotTransition(rbind(arrows_13, arrows_23), pairwise_distance) + ggtitle("UMAP1v3, 2v3")
+g3 <- plotTransition(rbind(arrows_13, arrows_23, arrows_12), pairwise_distance) + 
+  ggtitle("All pairwise UMAP axes")
+gridExtra::grid.arrange(g1, g2, g3, ncol = 3)
+```
