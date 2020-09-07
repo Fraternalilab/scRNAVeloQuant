@@ -4,7 +4,7 @@ This repository contains the code used to quantify and summarise individual RNA 
 
 The R markdown file contains all necessary functions to calculate and plot these estimates. Necessary input files for the 'Pure' dataset can be downloaded from ArrayExpress from [here]().
 
-The associated publication is now son [bioRxiv](https://www.biorxiv.org/content/10.1101/2020.09.03.281527v1). If you use it please cite:
+The associated publication is now on [bioRxiv](https://www.biorxiv.org/content/10.1101/2020.09.03.281527v1). If you use it please cite:
 
 Stewart AT, Ng J, Wallis G, Tsioligka V, Fraternali F & Dunn-Walters DK. (2020). Single-cell transcriptomic analyses define distinct peripheral B cell subsets and discrete development pathways. *bioRxiv* doi: 10.1101/2020.09.03.281527 
 
