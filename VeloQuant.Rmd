@@ -19,7 +19,7 @@ This markdown document contains codes used to plot `velocyto` results on 3D UMAP
 In the beginning we also attach the code used to remove Ig, TCR related genes from the variably-expressed features to avoid these genes to bias dimensionality reduction - this might be a useful line for those working with similar cell types.
 
 ```{r loadData, echo=FALSE}
-pure <- readRDS('Pure2_finalvs_UMAP3D.rds')
+pure <- readRDS('../Pure2_finalvs_UMAP3D.rds')
 
 # remove Ig, TCR related genes from variable features
 VariableFeatures(pure) <- VariableFeatures(pure)[!grepl("^IGH[MDE]|^IGHG[1-4]|^IGHA[1-2]|^IG[HKL][VDJ]|^IGKC|^IGLC[1-7]|^TR[ABGD][CV]|^AC233755.1|^IGLL|^JCHAIN", VariableFeatures(pure))]
@@ -88,9 +88,9 @@ PrepareCellsForVelocity <- function(object, idents, reduction = "umap", dims = c
 We follow [this](https://github.com/satijalab/seurat-wrappers/blob/master/docs/velocity.md) vignette from `SeuratWrappers`. 
 
 ```{r velocity_calc, echo=FALSE, message=FALSE, warning=FALSE, fig.width=12, fig.height=4}
-load('scPure_withIgE_velocity.RData')
+load('../scPure_withIgE_velocity.RData')
 colours <- Cells(pure)
-palette <- scales::hue_pal()(10)[c(5,2,9,1,6,4,7,8,10,3)]#[c(4, 6, 10, 3, 7, 8, 1, 9, 2, 5)]
+palette <- scales::hue_pal()(10)[c(5,2,9,1,6,4,10,8,7,3)]#[c(4, 6, 10, 3, 7, 8, 1, 9, 2, 5)]
 names(palette) <- levels(Idents(pure))
 for(celltype in levels(Idents(pure))){
   colours <- replace(colours, which(Idents(pure) == celltype), palette[celltype])
