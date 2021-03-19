@@ -6,14 +6,19 @@ The R markdown file contains all necessary functions to calculate and plot these
 
 The associated publication is now on [bioRxiv](https://www.biorxiv.org/content/10.1101/2020.09.03.281527v1). If you use it please cite:
 
-Stewart AT, Ng J, Wallis G, Tsioligka V, Fraternali F & Dunn-Walters DK. (2020). Single-cell transcriptomic analyses define distinct peripheral B cell subsets and discrete development pathways. *bioRxiv* doi: 10.1101/2020.09.03.281527 
+Stewart AT, Ng J, Wallis G, Tsioligka V, Fraternali F & Dunn-Walters DK. (2021). Single-cell transcriptomic analyses define distinct peripheral B cell subsets and discrete development pathways. *Frontiers In Immunology* 12:743. doi: 10.3389/fimmu.2021.602539 
 
 Or as a BibTex format entry:
 ```
-@article {Stewart2020.09.03.281527,
-	author = {Stewart, Alexander and Ng, Joseph and Wallis, Gillian and Tsioligka, Vasiliki and Fraternali, Franca and Dunn-Walters, Deborah},
-	title = {Single-cell transcriptomic analyses define distinct peripheral B cell subsets and discrete development pathways},
-	year = {2020},
-	doi = {10.1101/2020.09.03.281527},
-	journal = {bioRxiv}
-}```
+@ARTICLE{10.3389/fimmu.2021.602539,
+AUTHOR={Stewart, Alexander and Ng, Joseph Chi-Fung and Wallis, Gillian and Tsioligka, Vasiliki and Fraternali, Franca and Dunn-Walters, Deborah K.},   	 
+TITLE={Single-Cell Transcriptomic Analyses Define Distinct Peripheral B Cell Subsets and Discrete Development Pathways},     
+JOURNAL={Frontiers in Immunology},      
+VOLUME={12},      
+PAGES={743},     
+YEAR={2021},      
+URL={https://www.frontiersin.org/article/10.3389/fimmu.2021.602539},       
+DOI={10.3389/fimmu.2021.602539},      
+ISSN={1664-3224},   
+}
+```
