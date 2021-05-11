@@ -87,6 +87,8 @@ PrepareCellsForVelocity <- function(object, idents, reduction = "umap", dims = c
 
 We follow [this](https://github.com/satijalab/seurat-wrappers/blob/master/docs/velocity.md) vignette from `SeuratWrappers`. 
 
+Below, `vel` is the object `Tool(object = bm, slot = "RunVelocity")` from the velocyto calculation demonstrated in the vignette above.
+
 ```{r velocity_calc, echo=FALSE, message=FALSE, warning=FALSE, fig.width=12, fig.height=4}
 load('../scPure_withIgE_velocity.RData')
 colours <- Cells(pure)
